@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  mysql-primary:
+    image: mysql:8.0
+    container_name: mysql-primary
+    ports:
+      - "${PRIMARY_PORT}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+      MYSQL_DATABASE: "${MYSQL_DATABASE}"
+    volumes:
+      - mysql-primary-data:/var/lib/mysql
+      - ./docker/mysql-primary/my.cnf:/etc/mysql/conf.d/my.cnf:ro
+      - ./database:/docker-entrypoint-initdb.d # Para aplicar schema.sql na inicialização
+    networks:
+      mysql-network:
+        ipv4_address: 172.25.0.10  # IP FIXO
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+      start_period: 30s # Aumentado para Windows Docker Desktop
+    command:
+      - --server-id=1
+      - --log-bin=mysql-bin
+      - --binlog-format=ROW
+    restart: always
+
+  mysql-replica:
+    image: mysql:8.0
+    container_name: mysql-replica
+    ports:
+      - "${REPLICA_PORT}:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+      MYSQL_DATABASE: "${MYSQL_DATABASE}"
+    volumes:
+      - mysql-replica-data:/var/lib/mysql
+      - ./docker/mysql-replica/my.cnf:/etc/mysql/conf.d/my.cnf:ro
+    networks:
+      mysql-network:
+        ipv4_address: 172.25.0.11  # IP FIXO
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 5s
+      timeout: 20s
+      retries: 10
+      start_period: 30s # Aumentado para Windows Docker Desktop
+    command:
+      - --server-id=2
+      - --log-bin=mysql-bin
+      - --binlog-format=ROW
+      - --relay-log=relay-bin
+      - --read-only=1
+    restart: always
+
+  init-replication:
+    build:
+      context: ./docker/init-replication
+      dockerfile: Dockerfile
+    container_name: init-replication
+    networks:
+      - mysql-network
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+      MYSQL_DATABASE: "${MYSQL_DATABASE}"
+      MYSQL_REPLICATION_USER: "${MYSQL_REPLICATION_USER}"
+      MYSQL_REPLICATION_PASSWORD: "${MYSQL_REPLICATION_PASSWORD}"
+    depends_on:
+      mysql-primary:
+        condition: service_healthy
+      mysql-replica:
+        condition: service_healthy
+    profiles:
+      - setup
+    restart: "no" # Este serviço deve rodar apenas uma vez com o profile setup
+
+volumes:
+  mysql-primary-data:
+  mysql-replica-data:
+
+networks:
+  mysql-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16

@@ -1,10 +1,10 @@
 -- database/schema.sql
 
 -- Create the database if it does not exist
-CREATE DATABASE IF NOT EXISTS aula_db;
+CREATE DATABASE IF NOT EXISTS aula-db;
 
 -- Use the created database
-USE aula_db;
+USE aula-db;
 
 -- Create the 'produto' table with the specified structure
 CREATE TABLE IF NOT EXISTS produto (

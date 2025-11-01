@@ -9,6 +9,7 @@ dotenv.config();
 // Utility function for introducing delays
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
+const CRIADO_POR = process.env.CRIADO_POR || 'GrupoB';
 
 const sampleProducts: Omit<Produto, 'id' | 'criado_em'>[] = [
   { descricao: 'Notebook Dell Inspiron', categoria: 'Informatica', valor: 3500.00, criado_por: CRIADO_POR },
