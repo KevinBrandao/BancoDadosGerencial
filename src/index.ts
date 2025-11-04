@@ -1,116 +1,151 @@
-import dotenv from 'dotenv';
-import { ProdutoService } from './services/produto.service';
-import { Produto } from './models/produto.model';
-import { info, success, error, warn } from './utils/logger';
-import { closePools, testConnections } from './config/database';
+import dotenv from "dotenv";
+import express, { Request, Response } from "express";
+import cors from "cors";
+import { ProdutoService } from "./services/produto.service";
+import { info, success, error, warn } from "./utils/logger";
+import { closePools, testConnections } from "./config/database";
+import { Produto } from "./models/produto.model";
 
+// Carrega variáveis de ambiente
 dotenv.config();
 
-// Utility function for introducing delays
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const app = express();
+const port = process.env.SERVER_PORT || 3000;
+const produtoService = new ProdutoService();
 
-const CRIADO_POR = process.env.CRIADO_POR || 'GrupoB';
+// --- Middlewares ---
+app.use(cors()); // Permite requisições de outros domínios
+app.use(express.json()); // Habilita o parsing de JSON no body das requisições
 
-const sampleProducts: Omit<Produto, 'id' | 'criado_em'>[] = [
-  { descricao: 'Notebook Dell Inspiron', categoria: 'Informatica', valor: 3500.00, criado_por: CRIADO_POR },
-  { descricao: 'Mouse Logitech MX', categoria: 'Periferico', valor: 250.00, criado_por: CRIADO_POR },
-  { descricao: 'Teclado Mecanico', categoria: 'Periferico', valor: 450.00, criado_por: CRIADO_POR },
-  { descricao: 'Monitor LG 27"', categoria: 'Informatica', valor: 1200.00, criado_por: CRIADO_POR },
-  { descricao: 'Webcam Full HD', categoria: 'Periferico', valor: 350.00, criado_por: CRIADO_POR },
-  { descricao: 'Headset Gamer', categoria: 'Audio', valor: 280.00, criado_por: CRIADO_POR },
-  { descricao: 'SSD 1TB Samsung', categoria: 'Hardware', valor: 550.00, criado_por: CRIADO_POR },
-  { descricao: 'Cadeira Gamer', categoria: 'Moveis', valor: 1100.00, criado_por: CRIADO_POR },
-  { descricao: 'Mousepad Grande', categoria: 'Acessorios', valor: 80.00, criado_por: CRIADO_POR },
-  { descricao: 'Hub USB-C 7 Portas', categoria: 'Acessorios', valor: 150.00, criado_por: CRIADO_POR },
-  // Add an extra product that might cause a unique constraint error if run multiple times without clearing DB
-  // { descricao: 'Notebook Dell Inspiron', categoria: 'Informatica', valor: 3600.00, criado_por: CRIADO_POR },
-];
+// --- Rotas da API ---
 
-async function main() {
-  info('Iniciando o projeto Primary-Replica...');
+/**
+ * Rota de Health Check
+ */
+app.get("/health", (req: Request, res: Response) => {
+    res.status(200).json({ status: "UP" });
+});
 
-  // 1. Test database connections
-  await testConnections();
+/**
+ * POST /produtos
+ * Cria um novo produto.
+ * Conecta-se ao banco de dados PRIMARY (Escrita).
+ */
+app.post("/produtos", async (req: Request, res: Response) => {
+    try {
+        const { descricao, categoria, valor, criado_por } = req.body;
 
-  const produtoService = new ProdutoService();
-  let lastInsertedProductId: number | undefined;
+        let cp = criado_por ? criado_por : process.env.CRIADO_POR || "GrupoB";
 
-  // Graceful shutdown on Ctrl+C
-  process.on('SIGINT', async () => {
-    warn('SIGINT recebido. Fechando conexões do banco de dados...');
-    await closePools();
-    process.exit(0);
-  });
+        if (!descricao || !categoria || !valor) {
+            return res
+                .status(400)
+                .json({
+                    message:
+                        "Campos obrigatórios ausentes: descricao, categoria, valor",
+                });
+        }
 
-  for (let i = 0; i < sampleProducts.length; i++) {
-    const productToInsert = sampleProducts[i];
-    info(`--- Iteração ${i + 1}/${sampleProducts.length} ---`);
+        const novoProduto: Omit<Produto, "id" | "criado_em"> = {
+            descricao,
+            categoria,
+            valor: Number(valor),
+            criado_por: cp,
+        };
+
+        const produtoInserido = await produtoService.inserirProduto(
+            novoProduto
+        );
+        res.status(201).json(produtoInserido); // 201 Created
+    } catch (err: any) {
+        if (err.code === "ER_DUP_ENTRY") {
+            error(`[API] Falha ao criar produto: ${err.message}`);
+            res.status(409).json({
+                message: "Produto com esta descrição e autor já existe.",
+            }); // 409 Conflict
+        } else {
+            error(`[API] Erro interno no POST /produtos: ${err.message}`);
+            res.status(500).json({ message: "Erro interno do servidor." });
+        }
+    }
+});
+
+/**
+ * GET /produtos
+ * Lista todos os produtos.
+ * Conecta-se ao banco de dados REPLICA (Leitura).
+ */
+app.get("/produtos", async (req: Request, res: Response) => {
+    try {
+        const produtos = await produtoService.consultarTodosProdutos();
+        res.status(200).json(produtos);
+    } catch (err: any) {
+        error(`[API] Erro interno no GET /produtos: ${err.message}`);
+        res.status(500).json({ message: "Erro interno do servidor." });
+    }
+});
+
+/**
+ * GET /produtos/:id
+ * Busca um produto específico pelo ID.
+ * Conecta-se ao banco de dados REPLICA (Leitura).
+ */
+app.get("/produtos/:id", async (req: Request, res: Response) => {
+    try {
+        const id = parseInt(req.params.id, 10);
+        if (isNaN(id)) {
+            return res.status(400).json({ message: "ID inválido." });
+        }
+
+        const produto = await produtoService.consultarProdutoPorId(id);
+        if (produto) {
+            res.status(200).json(produto);
+        } else {
+            res.status(404).json({ message: "Produto não encontrado." }); // 404 Not Found
+        }
+    } catch (err: any) {
+        error(`[API] Erro interno no GET /produtos/:id: ${err.message}`);
+        res.status(500).json({ message: "Erro interno do servidor." });
+    }
+});
+
+/**
+ * Função de inicialização do servidor
+ */
+async function startServer() {
+    info("Iniciando o servidor da API...");
 
     try {
-      // a) Insere um produto no PRIMARY
-      const insertedProduct = await produtoService.inserirProduto(productToInsert);
-      lastInsertedProductId = insertedProduct.id;
+        // 1. Testa as conexões com os bancos
+        await testConnections();
 
-      // b) Espera 500ms-1s
-      await sleep(Math.floor(Math.random() * 501) + 500); // Between 500ms and 1000ms
-
-      // c) Imprime o produto inserido com o ID gerado
-      success(`Produto inserido: ID ${insertedProduct.id}, Descrição: ${insertedProduct.descricao}, Criado em: ${insertedProduct.criado_em?.toLocaleString()}`);
-
-      if (lastInsertedProductId !== undefined) {
-        // d) Realiza 10 operações SELECT no REPLICA para IDs anteriores
-        info(`Consultando os 10 produtos anteriores ao ID ${lastInsertedProductId} no REPLICA...`);
-        const previousProducts = await produtoService.consultarProdutosAnteriores(lastInsertedProductId, 10);
-
-        if (previousProducts.length > 0) {
-          info('Produtos anteriores encontrados:');
-          console.table(previousProducts.map(p => ({
-            ID: p.id,
-            Descricao: p.descricao,
-            Categoria: p.categoria,
-            Valor: p.valor.toFixed(2),
-            CriadoEm: p.criado_em?.toLocaleString(),
-            CriadoPor: p.criado_por
-          })));
-        } else {
-          warn('Nenhum produto anterior encontrado no REPLICA.');
-        }
-      }
-
-      // f) Espera 1-2s antes da próxima iteração
-      await sleep(Math.floor(Math.random() * 1001) + 1000); // Between 1000ms and 2000ms
-
+        // 2. Inicia o listener da API
+        app.listen(port, () => {
+            success(`Servidor rodando na porta ${port}`);
+            info(`Rotas disponíveis:`);
+            info(
+                `  POST http://localhost:${port}/produtos (Escreve no PRIMARY)`
+            );
+            info(`  GET  http://localhost:${port}/produtos (Lê do REPLICA)`);
+            info(
+                `  GET  http://localhost:${port}/produtos/:id (Lê do REPLICA)`
+            );
+        });
     } catch (err: any) {
-      error(`Falha na iteração ${i + 1}: ${err.message}`);
-      // Continue to next product or decide to exit
-      await sleep(2000); // Delay before next attempt even on error
+        error(`Falha ao iniciar o servidor: ${err.message}`);
+        process.exit(1);
     }
-  }
-
-  success('Todas as operações de inserção e consulta foram concluídas.');
-
-  // Optionally, show all products at the end
-  info('Consultando todos os produtos no REPLICA para verificação final...');
-  const allProducts = await produtoService.consultarTodosProdutos();
-  if (allProducts.length > 0) {
-    info('Todos os produtos no banco de dados:');
-    console.table(allProducts.map(p => ({
-      ID: p.id,
-      Descricao: p.descricao,
-      Categoria: p.categoria,
-      Valor: p.valor.toFixed(2),
-      CriadoEm: p.criado_em?.toLocaleString(),
-      CriadoPor: p.criado_por
-    })));
-  } else {
-    warn('Nenhum produto encontrado no banco de dados.');
-  }
-
-  await closePools();
-  success('Projeto Primary-Replica finalizado com sucesso.');
 }
 
-main().catch(err => {
-  error(`Erro fatal no programa principal: ${err.message}`);
-  closePools().finally(() => process.exit(1));
-});
+// --- Gerenciamento de Encerramento (Graceful Shutdown) ---
+const shutdown = async () => {
+    warn("SIGINT recebido. Fechando conexões do banco de dados...");
+    await closePools();
+    process.exit(0);
+};
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
+
+// Inicia a aplicação
+startServer();

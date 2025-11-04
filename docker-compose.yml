@@ -5,7 +5,7 @@ services:
     image: mysql:8.0
     container_name: mysql-primary
     ports:
-      - "${PRIMARY_PORT}:3306"
+      - "${PRIMARY_DB_PORT}:3306"
     environment:
       MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
       MYSQL_DATABASE: "${MYSQL_DATABASE}"
@@ -32,7 +32,7 @@ services:
     image: mysql:8.0
     container_name: mysql-replica
     ports:
-      - "${REPLICA_PORT}:3306"
+      - "${REPLICA_DB_PORT}:3306"
     environment:
       MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
       MYSQL_DATABASE: "${MYSQL_DATABASE}"
