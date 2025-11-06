@@ -1,0 +1,98 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  font-family: system-ui, sans-serif;
+  background-color: #f4f4f4;
+}
+
+.App {
+  display: flex;
+  gap: 2rem;
+}
+
+.panel {
+  flex: 1;
+  background-color: #fff;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.panel-write {
+  border-top: 5px solid #007bff; /* Azul para Escrita (Primary) */
+}
+
+.panel-read {
+  border-top: 5px solid #28a745; /* Verde para Leitura (Replica) */
+}
+
+h2 {
+  margin-top: 0;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+form div {
+  display: flex;
+  flex-direction: column;
+}
+
+form label {
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+form input {
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+button {
+  padding: 0.6rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+button[type="submit"] {
+  background-color: #007bff;
+  color: white;
+}
+
+button.refresh-btn {
+  background-color: #28a745;
+  color: white;
+  margin-bottom: 1rem;
+}
+
+.log {
+  background-color: #222;
+  color: #00ff00;
+  padding: 1rem;
+  border-radius: 4px;
+  font-family: monospace;
+  white-space: pre-wrap;
+  height: 150px;
+  overflow-y: auto;
+  margin-top: 1rem;
+}
+
+.product-list {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.product-item {
+  background-color: #f9f9f9;
+  border: 1px solid #eee;
+  padding: 0.5rem;
+  margin-bottom: 0.5rem;
+  border-radius: 4px;
+}

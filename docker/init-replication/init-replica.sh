@@ -49,6 +49,10 @@ wait_for_mysql() {
 echo ""
 echo "=== VERIFICANDO CONECTIVIDADE ==="
 
+# CHAMADAS PARA A FUNÇÃO DE ESPERA (A CORREÇÃO DO BUG 1)
+wait_for_mysql "$PRIMARY_HOST"
+wait_for_mysql "$REPLICA_HOST"
+
 # Capturar status do master
 echo ""
 echo "=== CAPTURANDO STATUS DO MASTER ==="
@@ -128,7 +132,7 @@ sleep 10
 echo ""
 echo "=== VERIFICANDO DADOS REPLICADOS ==="
 
-REPLICA_COUNT=$(mysql -h "$REPLICA_HOST" -u root -p"$ROOT_PASSWORD" -e "USE aula-db; SELECT COUNT(*) FROM produtos;" 2>/dev/null | tail -n1)
+REPLICA_COUNT=$(mysql -h "$REPLICA_HOST" -u root -p"$ROOT_PASSWORD" -e "USE aula-db; SELECT COUNT(*) FROM produto;" 2>/dev/null | tail -n1)
 
 echo "Registros na réplica: $REPLICA_COUNT"
 
