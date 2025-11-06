@@ -4,6 +4,13 @@ Este projeto demonstra a implementação de uma arquitetura de banco de dados Pr
 
 O objetivo é simular um cenário onde operações de escrita (`INSERT`) são direcionadas para um banco de dados primário (PRIMARY) e operações de leitura (`SELECT`) são direcionadas para um banco de dados de réplica (REPLICA). Isso otimiza a performance e a escalabilidade da aplicação.
 
+**Participantes do Grupo:**
+
+  * GIAN CARLO FAVA
+  * FELIPE FERREIRA REZENDE
+  * KEVIN DE ALMEIDA BRANDAO
+  * SILVIO ALVES DA SILVA JUNIOR
+
 ## Arquitetura
 
 O ambiente é orquestrado pelo `docker-compose.yml` e consiste nos seguintes componentes:
